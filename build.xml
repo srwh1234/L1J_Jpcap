@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="L1J_Jpcap" basedir="." default="buildjar">
+
+	<property name="main.name" value="main.Api" />
+	<property name="jar.name" value="L1Jpcap.jar" />
+	<property name="lib.name" value="lib" />
+
+	<property name="src.dir" value="src" />
+	<property name="class.dir" value="build/class/" />
+	<property name="output.dir" value="build/dist" />
+	<property name="lib.dir" value="build/dist/${lib.name}" />
+	<property name="res.dir" value="resource" />
+
+
+
+	<!-- 1. 初始化，例如創建目錄-->
+	<target name="init">
+		<!--mkdir dir="${classes.dir}"/-->
+		<mkdir dir="${output.dir}" />
+
+
+		<!-- 將外部jar從 resource 複製到 lib資料夾 -->
+		<mkdir dir="${lib.dir}" />
+		<copy todir="${lib.dir}">
+			<fileset dir="${res.dir}">
+				<include name="*.*" />
+			</fileset>
+		</copy>
+	</target>
+
+	<!-- 2. 編譯-->
+	<target name="compile" depends="init">
+		<path id="lib-classpath">
+			<fileset dir="${res.dir}">
+				<include name="*.jar" />
+			</fileset>
+		</path>
+		<javac srcdir="${src.dir}" destdir="${class.dir}" includeAntRuntime="false">
+			<compilerarg line="-encoding UTF-8" />
+			<classpath refid="lib-classpath" />
+		</javac>
+	</target>
+
+
+	<!-- 3. 打包jar文件 -->
+	<target name="buildjar" depends="compile">
+		<!--自動讀lib目錄裡所有jar -->
+		<pathconvert property="libs.project" pathsep=" ">
+			<path>
+				<fileset dir="${lib.dir}">
+					<include name="**/*.jar" />
+				</fileset>
+			</path>
+
+			<!--ant里面mapper標籤是和fileset配合使用的，目的就是把fileset取出的文件名轉成指定的樣式-->
+			<mapper>
+				<chainedmapper>
+					<!--移除絕對路徑-->
+					<flattenmapper />
+					<!--加入前綴-->
+					<globmapper from="*" to="${lib.name}/*" />
+				</chainedmapper>
+			</mapper>
+		</pathconvert>
+
+		<!-- 建立一個 JAR 檔案並設置其 manifest 檔案的屬性 -->
+		<jar destfile="${output.dir}/${jar.name}" basedir="${class.dir}">
+			<manifest>
+				<attribute name="Main-class" value="${main.name}" />
+				<attribute name="Class-Path" value="${libs.project}" />
+			</manifest>
+		</jar>
+	</target>
+
+</project>
