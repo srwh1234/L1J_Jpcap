@@ -31,7 +31,7 @@ public class PacketLogger {
 		final String describe = String.format("SubCode: %d (%d)", subCode, data.length);
 
 		System.out.println(String.format("[%s] %s", packetName, describe));
-		System.out.println(StaticUtils.showHexText(data));
+		System.out.println(StaticUtils.getHexText(data));
 	}
 
 	public void write() {
@@ -53,7 +53,7 @@ public class PacketLogger {
 			final String describe = String.format("SubCode: %d (%d)", subCode, data.length);
 
 			bw.write(String.format("[%s] %s\t\t\t\t%s\n", packetName, describe, date));
-			bw.write(StaticUtils.showHexText(data) + "\n");
+			bw.write(StaticUtils.getHexText(data) + "\n");
 			bw.flush();
 
 		} catch (final Exception e) {

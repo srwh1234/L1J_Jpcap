@@ -4,14 +4,25 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
 
 public class StaticUtils {
 
-	public static String showHexText(final byte[] data) {
+	private static String fillHex(final int i, final int j) {
+		String s = Integer.toHexString(i);
+		for (int k = s.length(); k < j; k++) {
+			s = (new StringBuilder()).append("0").append(s).toString();
+		}
+		return s;
+	}
 
-		final HashMap<Integer, String> list = splitBinary(data);
+	/**
+	 * 將byte陣列 做文字顯示的格式化
+	 */
+	public static String getHexText(final byte[] data) {
+		final HashMap<Integer, String> list = findStrings(data);
 
 		final StringBuffer sb = new StringBuffer();
 		int byteCount = 0;
@@ -60,31 +71,37 @@ public class StaticUtils {
 		return sb.toString();
 	}
 
-	// 用0x00分割陣列
-	private static HashMap<Integer, String> splitBinary(final byte[] data) {
-		final HashMap<Integer, String> list = new HashMap<>();
+	/**
+	 * 0x00為字串的結尾 *
+	 * 用此找出可能是文字的byte陣列,並轉成文字
+	 */
+	private static HashMap<Integer, String> findStrings(final byte[] data) {
+		final HashMap<Integer, String> result = new HashMap<>();
+		int index = 1;
+		int start = 1;
 
-		int copyBegin = 1;
-		for (int i = 1; i < data.length; i++) {
+		while (start < data.length) {
 
-			if (data[i] == 0x00) {
-
-				final byte[] splitData = new byte[i - copyBegin];
-
-				System.arraycopy(data, copyBegin, splitData, 0, splitData.length);
-
-				list.put(copyBegin, isBig5Encoding(splitData));
-
-				if (i + 1 < data.length) {
-					copyBegin = i + 1;
-				}
+			// 找出下一個0x00
+			int end = start;
+			while (end < data.length && data[end] != 0x00) {
+				end++;
 			}
+
+			// 複製陣列並判斷是否文字
+			final byte[] bytes = Arrays.copyOfRange(data, start, end);
+			final String str = toBig5Encoding(bytes);
+			result.put(index, str);
+
+			// 下個循環
+			index += bytes.length + 1;
+			start = end + 1;
 		}
-		return list;
+		return result;
 	}
 
-	// 中文化
-	public static String isBig5Encoding(final byte[] bytes) {
+	// 中文字
+	private static String toBig5Encoding(final byte[] bytes) {
 		boolean isBig5 = false;
 		boolean isANSI = false;
 		String result = "";
@@ -95,15 +112,30 @@ public class StaticUtils {
 			}
 
 			int begin = 0;
+			/*
+			 常用的 BIG5 內碼區域
+			
+			0xA140-0xA3BF: 標點符號、希臘字母及特殊符號
+			0xA440-0xC67E: 常用漢字，先按筆劃再按部首排序。
+			0xC940-0xF9D5: 次常用漢字，亦是先按筆劃再按部首排序。
+			 * */
 
 			// 判斷前後2byte是不是Big5
 			for (int i = 0; i < bytes.length - 1; i++) {
-				// 「高位位元組」使用了0x81-0xFE，「低位位元組」使用了0x40-0x7E
-				if ((bytes[i] >= 0xa4 && bytes[i] <= 0xc6) && ((bytes[i + 1] >= 0x40 && bytes[i + 1] <= 0x7e))) {
+
+				// 標點符號
+				if ((bytes[i] >= 0x40 && bytes[i] <= 0xBF)//
+						&& (bytes[i + 1] >= 0xA1 && bytes[i + 1] <= 0xA3)) {
 					begin = i % 2;
 					break;
 				}
 
+				// 常用漢字
+				if ((bytes[i] >= 0x40 && bytes[i] <= 0x7E)//
+						&& (bytes[i + 1] >= 0xA4 && bytes[i + 1] <= 0xC6)) {
+					begin = i % 2;
+					break;
+				}
 			}
 
 			// 翻譯
@@ -119,35 +151,28 @@ public class StaticUtils {
 
 				final byte[] bb = new byte[] { (byte) (tmp >>> 8), (byte) tmp };
 
-				// 0xA440-0xC67E || 0xC940-0xF9D5||0xA140-0xA3BF
-				if ((tmp >= 0xA440 && tmp <= 0xC67E)) {
+				// 0xA140-0xA3BF || 0xA440-0xC67E
+				if (tmp >= 0xA140 && tmp <= 0xA3BF			//
+						|| tmp >= 0xA440 && tmp <= 0xC67E) {
 					result += new String(bb, "BIG5");
 					isBig5 = true;
 				} else {
-					result += (bb[0] > 31 && bb[0] < 128 && !isBig5) ? (char) bb[0] : "";
-					result += (bb[1] > 31 && bb[1] < 128 && !isBig5) ? (char) bb[1] : "";
+					result += (bb[0] >= 0x20 && bb[0] < 0x80 && !isBig5) ? (char) bb[0] : "";
+					result += (bb[1] >= 0x20 && bb[1] < 0x80 && !isBig5) ? (char) bb[1] : "";
 					isANSI = true;
 				}
-
 			}
+
 			result = result.trim();
 
 			if (result.isEmpty() || (isANSI && result.length() < 2)) {
-				return "";
+				result = "";
 			}
+
 		} catch (final Exception e) {
 			e.printStackTrace();
 		}
-
 		return result;
-	}
-
-	private static String fillHex(final int i, final int j) {
-		String s = Integer.toHexString(i);
-		for (int k = s.length(); k < j; k++) {
-			s = (new StringBuilder()).append("0").append(s).toString();
-		}
-		return s;
 	}
 
 	// XXX 判斷
